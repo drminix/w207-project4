@@ -11,8 +11,8 @@ import numpy as np
 import cv2
 from collections import namedtuple
 
-DEFAULT_MODEL_FILE = r"model/VGG16_imagenet_knn.h5"
-OPENCV_FACE_DETECTION_XML = r"model/haarcascade_frontalface_default.xml"
+DEFAULT_MODEL_FILE = r"model/VGG16_DataAug.h5"
+OPENCV_FACE_DETECTION_XML = r"model/haarcascade_frontalface_alt.xml"
 TARGET_IMAGE_WIDTH = 96
 TARGET_IMAGE_HEIGHT = 96
 logger = logging.getLogger(__name__)
@@ -27,6 +27,8 @@ LEFT_EYEBROW_OUTER_END = Point(14, 15)
 RIGHT_EYEBROW_OUTER_END = Point(18, 19)
 MOUSE_CENTER_BOTTOM_LIP = Point(28, 29)
 MOUSE_CENTER_TOP_LIP = Point(26, 27)
+MOUSE_LEFT_CORNER = Point(22,23)
+MOUSE_RIGHT_CORNER = Point(24,25)
 NOSE_TIP = Point(20, 21)
 DEFAULT_MAIN_WINDOW_WIDTH = 800
 DEFAULT_MAIN_WINDOW_HEIGHT = 800
@@ -67,20 +69,17 @@ class QtCapture(QWidget):
             # copy the area we want to manipulate
             bg = target_image[y : y + height, x : x + width]
             # add the image in
-            np.multiply(
-                bg,
-                np.atleast_3d(255 - source_image[:, :, 3]) / 255.0,
-                out=bg,
-                casting="unsafe",
-            )
+            mask = source_image[:, :, 3]
+            bg[mask!=0] = 0
+            source_image[mask==0] = 0
             np.add(
                 bg,
-                source_image[:, :, 0:3] * np.atleast_3d(source_image[:, :, 3]),
+                source_image[:, :, 0:3],
                 out=bg,
             )
             # put the changed image back into the scene
             target_image[y : y + height, x : x + width] = bg
-        except ValueError as err:
+        except:
             # continue to next frame when image cannot be fit
             return
 
@@ -157,7 +156,7 @@ class QtCapture(QWidget):
                 cigarette_height = (
                     scaled_fps[MOUSE_CENTER_BOTTOM_LIP.y]
                     - scaled_fps[MOUSE_CENTER_TOP_LIP.y]
-                    - 20
+                    - 60
                 )
                 cigarette_height = 10 if cigarette_height < 10 else cigarette_height
                 cigarette_y = scaled_fps[MOUSE_CENTER_TOP_LIP.y]
@@ -173,16 +172,15 @@ class QtCapture(QWidget):
 
             # (d) N95 mask
             if self._display_n95mask:
-                n95mask_width = (
+                n95mask_width = int((
                     scaled_fps[LEFT_EYEBROW_OUTER_END.x]
                     - scaled_fps[RIGHT_EYEBROW_OUTER_END.x]
-                    + 80
-                )
-                n95mask_height = (
+                ) * 1.3)
+                n95mask_height = int((
                     scaled_fps[MOUSE_CENTER_BOTTOM_LIP.y] - scaled_fps[NOSE_TIP.y]
-                ) * 3
-                n95mask_x = scaled_fps[RIGHT_EYEBROW_OUTER_END.x] - 40
-                n95mask_y = scaled_fps[NOSE_TIP.y] - 60
+                ) * 2.8)
+                n95mask_x = int(scaled_fps[RIGHT_EYEBROW_OUTER_END.x] - (scaled_fps[MOUSE_LEFT_CORNER.x] - scaled_fps[MOUSE_RIGHT_CORNER.x])/3)
+                n95mask_y = int(scaled_fps[NOSE_TIP.y] - (scaled_fps[MOUSE_CENTER_BOTTOM_LIP.y] - scaled_fps[MOUSE_CENTER_TOP_LIP.y]))
                 self.add_image(
                     color,
                     self._n95mask,
@@ -191,8 +189,6 @@ class QtCapture(QWidget):
                     n95mask_width,
                     n95mask_height,
                 )
-
-                pass
 
         # display the image in QT pixmap
         img = QImage(
@@ -288,6 +284,7 @@ class FacialPointViewer(QtWidgets.QMainWindow):
         self._ui.menu_File.triggered.connect(self.closeEvent)
         self._ui.menu_About.triggered.connect(self.showAboutDialog)
         self._ui.pushButton_browse.clicked.connect(self.browseModel)
+
         # initial state
         self._ui.checkBox_fps.setChecked(True)
 
