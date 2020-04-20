@@ -1,0 +1,5 @@
+Web app:
+https://github.com/jying-data/facial-recognition
+
+Live detection GUI
+https://github.com/drminix/w207-project4/tree/master/facialpointviewer
